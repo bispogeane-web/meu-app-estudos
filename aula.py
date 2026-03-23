@@ -6,7 +6,7 @@ from supabase import create_client, Client
 st.set_page_config(page_title="Português Total", page_icon="📚", layout="wide")
 
 # Configuração
-GOOGLE_API_KEY = "AIzaSyAa4B9AEiPVWcBxGtFPS2xhx1oUJJVMmdE"
+GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
 genai.configure(api_key=GOOGLE_API_KEY)
 modelo = genai.GenerativeModel('gemini-2.5-flash', generation_config={"response_mime_type": "application/json"})
 
