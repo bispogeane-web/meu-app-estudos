@@ -107,6 +107,8 @@ if 'sessao_iniciada' not in st.session_state:
     st.session_state.indice_questao_atual = 0
     st.session_state.errou_atual = False
     st.session_state.acertou_atual = False
+    st.session_state.tentativas_atuais = 0
+    st.session_state.ultima_resposta_errada = None
     st.session_state.sessao_iniciada = True
     carregar_progresso()
 
@@ -115,6 +117,8 @@ def resetar_estudo():
     st.session_state.indice_questao_atual = 0
     st.session_state.errou_atual = False
     st.session_state.acertou_atual = False
+    st.session_state.tentativas_atuais = 0
+    st.session_state.ultima_resposta_errada = None
 
 st.sidebar.title("🛤️ Trilha de Aprendizagem")
 st.sidebar.caption(f"Usuário: {st.session_state.user.email}")
@@ -139,7 +143,10 @@ is_simulado = "🏆 SIMULADO FINAL" in tema_escolhido
 st.title("📚 Português Total")
 st.caption("Resolva a bateria inteira de exercícios para comprovar aprendizado e liberar o próximo bloco.")
 
-if st.sidebar.button("Gerar Bateria" if not is_simulado else "INICIAR SIMULADO", on_click=resetar_estudo, type="primary"):
+btn_gerar = st.sidebar.button("Gerar Bateria" if not is_simulado else "INICIAR SIMULADO", on_click=resetar_estudo, type="primary")
+
+if btn_gerar or st.session_state.get("gerar_nova_bateria_agora", False):
+    st.session_state.gerar_nova_bateria_agora = False
     with st.spinner("Preparando as questões das piores bancas para você..."):
         if is_simulado:
             prompt = f"""
@@ -147,7 +154,7 @@ if st.sidebar.button("Gerar Bateria" if not is_simulado else "INICIAR SIMULADO",
             Regras:
             1. NÃO gere aula teórica. Apenas uma fala inicial desafiadora.
             2. Gere EXATAMENTE 7 questões inéditas (nível FGV/FCC) misturando os tópicos dessa área.
-            3. Responda em JSON EXATO com as chaves: "aula" (mensagem da professora), "questoes" (array com objetos contendo: "enunciado_questao", "opcoes" (com A a E), "resposta_correta" (só a letra) e "comentario_gabarito": "Explicacao...").
+            3. Responda em JSON EXATO com as chaves: "aula" (mensagem inicial), "questoes" (array numérico com objetos contendo: "enunciado_questao", "opcoes" (objeto de A a E), "resposta_correta" (só a letra) e "explicacoes" (objeto de A a E justificando o motivo de estar certo ou errado de forma isolada para cada letra)).
             """
         else:
             prompt = f"""
@@ -156,7 +163,7 @@ if st.sidebar.button("Gerar Bateria" if not is_simulado else "INICIAR SIMULADO",
             1. Aula ágil, direta ao ponto e de alto nível.
             2. Forneça o MACETE INFALÍVEL.
             3. IMPORTANTE: Gere UMA BATERIA DE EXATAMENTE 5 QUESTÕES inéditas (múltipla escolha) sobre o tema.
-            4. Responda em JSON EXATO com as chaves: "aula" (texto motivacional + teoria + macete em markdown), "questoes" (array com objetos contendo: "enunciado_questao", "opcoes" (com A a E), "resposta_correta" (só a letra) e "comentario_gabarito": "Explicacao rigorosa...").
+            4. Responda em JSON EXATO com as chaves: "aula" (teoria + macete em markdown), "questoes" (array com objetos contendo: "enunciado_questao", "opcoes" (com A a E), "resposta_correta" (letra) e "explicacoes" (um objeto de chaves A, B, C, D, E explicando detalhadamente APENAS cada alternativa sem revelar direto o gabarito nas alternativas erradas)).
             """
         try:
             resposta = modelo.generate_content(prompt)
@@ -190,25 +197,64 @@ if st.session_state.aula_dados:
                     if resposta_usuario[0] == q_atual["resposta_correta"]:
                         st.session_state.acertou_atual = True
                         st.session_state.errou_atual = False
+                        st.session_state.ultima_resposta_errada = None
                     else:
                         st.session_state.errou_atual = True
+                        st.session_state.tentativas_atuais = st.session_state.get('tentativas_atuais', 0) + 1
+                        st.session_state.ultima_resposta_errada = resposta_usuario[0]
                     st.rerun()
                 else:
                     st.warning("Marque uma alternativa!")
             
             if st.session_state.errou_atual:
-                st.error('❌ Errou! Esse é um erro clássico.')
-                st.warning(f"**Comentário do Professor:**\n{q_atual['comentario_gabarito']}")
-                st.info("Você precisa acertar a questão para avançar. Revise o comentário e tente de novo!")
+                letra_errada = st.session_state.ultima_resposta_errada
+                explicacao = q_atual.get("explicacoes", {}).get(letra_errada, q_atual.get("comentario_gabarito", "A alternativa incorreta! Revise a teoria."))
+                tentativas = st.session_state.get('tentativas_atuais', 0)
+                
+                if tentativas < 3:
+                    st.error(f'❌ Incorreto (Tentativa {tentativas}/3).')
+                    st.warning(f"**Por que a letra {letra_errada} está errada?**\n{explicacao}")
+                    st.info("Você precisa acertar a questão para avançar. Tente de novo sem perder o foco!")
+                else:
+                    st.error('❌ Você esgotou as 3 tentativas para essa questão!')
+                    st.warning(f"**Por que a letra {letra_errada} está errada?**\n{explicacao}")
+                    st.info("A resposta correta era a letra **" + q_atual["resposta_correta"] + "**.")
+                    if st.button("Gerar Nova Questão Substituta e Tentar Novamente", type="primary"):
+                        with st.spinner("Buscando nova questão de mesma complexidade..."):
+                            prompt_nova_questao = f"""
+                            Aja como um professor exigente. Gere APENAS UMA NOVA QUESTÃO inédita e desafiadora sobre o tópico "{tema_escolhido}".
+                            Responda EXATAMENTE neste formato JSON:
+                            {{
+                                "enunciado_questao": "...",
+                                "opcoes": {{"A": "...", "B": "...", "C": "...", "D": "...", "E": "..."}},
+                                "resposta_correta": "...",
+                                "explicacoes": {{"A": "...", "B": "...", "C": "...", "D": "...", "E": "..."}}
+                            }}
+                            """
+                            try:
+                                resposta_nova = modelo.generate_content(prompt_nova_questao)
+                                nova_q = json.loads(resposta_nova.text, strict=False)
+                                st.session_state.aula_dados["questoes"][idx] = nova_q
+                                st.session_state.errou_atual = False
+                                st.session_state.tentativas_atuais = 0
+                                st.session_state.ultima_resposta_errada = None
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Erro ao gerar questão. Clique novamente. ({e})")
                 
         else:
-            st.success(f"🎉 Exato! A letra correta é a **{q_atual['resposta_correta']}**.")
-            st.info(f"💡 **Fixação da Regra:**\n{q_atual['comentario_gabarito']}")
+            letra_certa = q_atual['resposta_correta']
+            explicacao_certa = q_atual.get("explicacoes", {}).get(letra_certa, q_atual.get("comentario_gabarito", "Excelente resolução!"))
+            
+            st.success(f"🎉 Exato! A letra correta é a **{letra_certa}**.")
+            st.info(f"💡 **Fixação da Regra:**\n{explicacao_certa}")
             
             if st.button("Avançar para Próxima Questão" if idx < qtd_questoes - 1 else "✅ FINALIZAR BATERIA", type="primary"):
                 st.session_state.indice_questao_atual += 1
                 st.session_state.acertou_atual = False
                 st.session_state.errou_atual = False
+                st.session_state.tentativas_atuais = 0
+                st.session_state.ultima_resposta_errada = None
                 
                 # Fim da bateria - Lógica de Desbloqueios e Salvar Progresso
                 if st.session_state.indice_questao_atual >= qtd_questoes:
@@ -229,9 +275,17 @@ if st.session_state.aula_dados:
         else:
             st.success("🎯 Trabalho excelente! Você superou a bateria inteira de questões e liberou o próximo tópico.")
             
-        if st.button("🚀 Ver Menu Atualizado", type="primary"):
-            resetar_estudo()
-            st.rerun()
+        st.write("### O que deseja fazer agora?")
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("🔄 Revisar Tópico (Gerar Nova Bateria)", use_container_width=True):
+                resetar_estudo()
+                st.session_state.gerar_nova_bateria_agora = True
+                st.rerun()
+        with col2:
+            if st.button("➡️ Avançar para Próximo Assunto" if not is_simulado else "🚀 Ver Menu", type="primary", use_container_width=True):
+                resetar_estudo()
+                st.rerun()
             
 else:
     st.info("👈 Escoha seu assunto no menu ao lado e comece a etapa de fixação!")
