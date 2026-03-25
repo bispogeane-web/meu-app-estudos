@@ -140,6 +140,13 @@ tema_escolhido = st.sidebar.selectbox("Escolha o Tópico específico:", topicos_
 tema_idx = topicos_da_area.index(tema_escolhido)
 is_simulado = "🏆 SIMULADO FINAL" in tema_escolhido
 
+is_revisao = False
+if not is_simulado:
+    if area_idx < int(st.session_state.area_desbloqueada_idx):
+        is_revisao = True
+    elif area_idx == int(st.session_state.area_desbloqueada_idx) and tema_idx < int(st.session_state.topico_desbloqueado_idx.get(area_idx, 0)):
+        is_revisao = True
+
 st.title("📚 Português Total")
 st.caption("Resolva a bateria inteira de exercícios para comprovar aprendizado e liberar o próximo bloco.")
 
@@ -155,6 +162,15 @@ if btn_gerar or st.session_state.get("gerar_nova_bateria_agora", False):
             1. NÃO gere aula teórica. Apenas uma fala inicial desafiadora.
             2. Gere EXATAMENTE 7 questões inéditas (nível FGV/FCC) misturando os tópicos dessa área.
             3. Responda em JSON EXATO com as chaves: "aula" (mensagem inicial), "questoes" (array numérico com objetos contendo: "enunciado_questao", "opcoes" (objeto de A a E), "resposta_correta" (só a letra) e "explicacoes" (objeto de A a E justificando o motivo de estar certo ou errado de forma isolada para cada letra)).
+            """
+        elif is_revisao:
+            prompt = f"""
+            Aja como um professor especialista. O aluno já estudou e ESTÁ REVISANDO o tema: "{tema_escolhido}" ({area_escolhida}).
+            Regras IMPORTANTES para a REVISÃO MODO AVANÇADO:
+            1. NÃO repita a teoria básica. Vá direto para exceções, pegadinhas de prova (FGV/FCC) e erros comuns de alunos bons.
+            2. Use ABORDAGENS DIFERENTES e EXEMPLOS 100% INÉDITOS que não costumam aparecer na primeira aula de introdução.
+            3. Gere UMA BATERIA DE EXATAMENTE 5 QUESTÕES inéditas e elaboradas (de alto nível de dificuldade).
+            4. Responda em JSON EXATO com as chaves: "aula" (teoria focada nas pegadinhas + macete novo em markdown), "questoes" (array numérico com objetos contendo: "enunciado_questao", "opcoes" (com A a E), "resposta_correta" (letra) e "explicacoes" (um objeto de chaves A, B, C, D, E explicando detalhadamente APENAS cada alternativa sem revelar direto o gabarito nas alternativas erradas)).
             """
         else:
             prompt = f"""
@@ -276,14 +292,15 @@ if st.session_state.aula_dados:
             st.success("🎯 Trabalho excelente! Você superou a bateria inteira de questões e liberou o próximo tópico.")
             
         st.write("### O que deseja fazer agora?")
+        st.info("Para rever outros assuntos concluídos, clique no botão **Voltar ao Menu Principal** abaixo e selecione qualquer tópico pela barra lateral (esquerda). O aplicativo Ativará automaticamente o **Modo de Revisão Avançada**, criando novas explicações e pegadinhas para você nunca repetir a mesma aula!")
         col1, col2 = st.columns(2)
         with col1:
-            if st.button("🔄 Revisar Tópico (Gerar Nova Bateria)", use_container_width=True):
+            if st.button("🔄 Aprofundar e Revisar este tópico novamente", use_container_width=True):
                 resetar_estudo()
                 st.session_state.gerar_nova_bateria_agora = True
                 st.rerun()
         with col2:
-            if st.button("➡️ Avançar para Próximo Assunto" if not is_simulado else "🚀 Ver Menu", type="primary", use_container_width=True):
+            if st.button("📋 Voltar ao Menu Principal", type="primary", use_container_width=True):
                 resetar_estudo()
                 st.rerun()
             
