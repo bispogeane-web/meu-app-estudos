@@ -129,7 +129,10 @@ area_escolhida = st.sidebar.selectbox("Escolha a Grande Área:", areas_ordenadas
 area_idx = areas_ordenadas.index(area_escolhida)
 
 topicos_da_area = opcoes_topicos[area_escolhida]
-tema_escolhido = st.sidebar.selectbox("Escolha o Tópico específico:", topicos_da_area)
+idx_max_topico = st.session_state.topico_desbloqueado_idx.get(area_idx, 0)
+topicos_liberados = topicos_da_area[:int(idx_max_topico) + 1]
+
+tema_escolhido = st.sidebar.selectbox("Escolha o Tópico específico:", topicos_liberados)
 tema_idx = topicos_da_area.index(tema_escolhido)
 
 qtd_questoes_desejada = st.sidebar.number_input("Quantidade de questões:", min_value=1, max_value=15, value=5, step=1)
