@@ -125,19 +125,15 @@ st.sidebar.caption(f"Usuário: {st.session_state.user.email}")
 st.sidebar.button("Sair (Logout)", on_click=log_out)
 st.sidebar.divider()
 
-areas_liberadas = areas_ordenadas[:int(st.session_state.area_desbloqueada_idx) + 1]
-area_escolhida = st.sidebar.selectbox("Escolha a Grande Área:", areas_liberadas)
+area_escolhida = st.sidebar.selectbox("Escolha a Grande Área:", areas_ordenadas)
 area_idx = areas_ordenadas.index(area_escolhida)
 
 topicos_da_area = opcoes_topicos[area_escolhida]
-if area_idx < st.session_state.area_desbloqueada_idx:
-    topicos_liberados = topicos_da_area
-else:
-    idx_max_topico = st.session_state.topico_desbloqueado_idx.get(area_idx, 0)
-    topicos_liberados = topicos_da_area[:int(idx_max_topico) + 1]
-
-tema_escolhido = st.sidebar.selectbox("Escolha o Tópico específico:", topicos_liberados)
+tema_escolhido = st.sidebar.selectbox("Escolha o Tópico específico:", topicos_da_area)
 tema_idx = topicos_da_area.index(tema_escolhido)
+
+qtd_questoes_desejada = st.sidebar.number_input("Quantidade de questões:", min_value=1, max_value=15, value=5, step=1)
+
 is_simulado = "🏆 SIMULADO FINAL" in tema_escolhido
 
 is_revisao = False
@@ -160,7 +156,7 @@ if btn_gerar or st.session_state.get("gerar_nova_bateria_agora", False):
             Aja como um professor especialista em concursos e crie um SIMULADO RIGOROSO sobre a área: "{area_escolhida}".
             Regras:
             1. NÃO gere aula teórica. Apenas uma fala inicial desafiadora.
-            2. Gere EXATAMENTE 7 questões inéditas (nível FGV/FCC) misturando os tópicos dessa área.
+            2. Gere EXATAMENTE {qtd_questoes_desejada} questões inéditas (nível FGV/FCC) misturando os tópicos dessa área.
             3. Responda em JSON EXATO com as chaves: "aula" (mensagem inicial), "questoes" (array numérico com objetos contendo: "enunciado_questao", "opcoes" (objeto de A a E), "resposta_correta" (só a letra) e "explicacoes" (objeto de A a E justificando o motivo de estar certo ou errado de forma isolada para cada letra)).
             """
         elif is_revisao:
@@ -169,7 +165,7 @@ if btn_gerar or st.session_state.get("gerar_nova_bateria_agora", False):
             Regras IMPORTANTES para a REVISÃO MODO AVANÇADO:
             1. NÃO repita a teoria básica. Vá direto para exceções, pegadinhas de prova (FGV/FCC) e erros comuns de alunos bons.
             2. Use ABORDAGENS DIFERENTES e EXEMPLOS 100% INÉDITOS que não costumam aparecer na primeira aula de introdução.
-            3. Gere UMA BATERIA DE EXATAMENTE 5 QUESTÕES inéditas e elaboradas (de alto nível de dificuldade).
+            3. Gere UMA BATERIA DE EXATAMENTE {qtd_questoes_desejada} QUESTÕES inéditas e elaboradas (de alto nível de dificuldade).
             4. Responda em JSON EXATO com as chaves: "aula" (teoria focada nas pegadinhas + macete novo em markdown), "questoes" (array numérico com objetos contendo: "enunciado_questao", "opcoes" (com A a E), "resposta_correta" (letra) e "explicacoes" (um objeto de chaves A, B, C, D, E explicando detalhadamente APENAS cada alternativa sem revelar direto o gabarito nas alternativas erradas)).
             """
         else:
@@ -178,7 +174,7 @@ if btn_gerar or st.session_state.get("gerar_nova_bateria_agora", False):
             Regras:
             1. Aula ágil, direta ao ponto e de alto nível.
             2. Forneça o MACETE INFALÍVEL.
-            3. IMPORTANTE: Gere UMA BATERIA DE EXATAMENTE 5 QUESTÕES inéditas (múltipla escolha) sobre o tema.
+            3. IMPORTANTE: Gere UMA BATERIA DE EXATAMENTE {qtd_questoes_desejada} QUESTÕES inéditas (múltipla escolha) sobre o tema.
             4. Responda em JSON EXATO com as chaves: "aula" (teoria + macete em markdown), "questoes" (array com objetos contendo: "enunciado_questao", "opcoes" (com A a E), "resposta_correta" (letra) e "explicacoes" (um objeto de chaves A, B, C, D, E explicando detalhadamente APENAS cada alternativa sem revelar direto o gabarito nas alternativas erradas)).
             """
         try:
@@ -279,8 +275,17 @@ if st.session_state.aula_dados:
                             if area_idx < len(areas_ordenadas) - 1:
                                 st.session_state.area_desbloqueada_idx += 1
                         else:
-                            if tema_idx == st.session_state.topico_desbloqueado_idx[area_idx]:
+                            if tema_idx == st.session_state.topico_desbloqueado_idx.get(area_idx, 0):
                                 st.session_state.topico_desbloqueado_idx[area_idx] += 1
+                                
+                    # Atualiza progresso se o usuário tiver avançado manualmente para áreas novas.
+                    if area_idx > st.session_state.area_desbloqueada_idx:
+                        st.session_state.area_desbloqueada_idx = area_idx
+                        if not is_simulado:
+                            st.session_state.topico_desbloqueado_idx[area_idx] = tema_idx + 1
+                    elif area_idx == st.session_state.area_desbloqueada_idx and not is_simulado and tema_idx > st.session_state.topico_desbloqueado_idx.get(area_idx, 0):
+                        st.session_state.topico_desbloqueado_idx[area_idx] = tema_idx + 1
+
                     salvar_progresso()
                 st.rerun()
                     
