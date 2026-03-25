@@ -125,17 +125,16 @@ st.sidebar.caption(f"Usuário: {st.session_state.user.email}")
 st.sidebar.button("Sair (Logout)", on_click=log_out)
 st.sidebar.divider()
 
-area_escolhida = st.sidebar.selectbox("Escolha a Grande Área:", areas_ordenadas)
+is_battery_active = st.session_state.get('aula_dados') is not None
+
+area_escolhida = st.sidebar.selectbox("Escolha a Grande Área:", areas_ordenadas, disabled=is_battery_active)
 area_idx = areas_ordenadas.index(area_escolhida)
 
 topicos_da_area = opcoes_topicos[area_escolhida]
-idx_max_topico = st.session_state.topico_desbloqueado_idx.get(area_idx, 0)
-topicos_liberados = topicos_da_area[:int(idx_max_topico) + 1]
-
-tema_escolhido = st.sidebar.selectbox("Escolha o Tópico específico:", topicos_liberados)
+tema_escolhido = st.sidebar.selectbox("Escolha o Tópico específico:", topicos_da_area, disabled=is_battery_active)
 tema_idx = topicos_da_area.index(tema_escolhido)
 
-qtd_questoes_desejada = st.sidebar.number_input("Quantidade de questões:", min_value=1, max_value=15, value=5, step=1)
+qtd_questoes_desejada = st.sidebar.number_input("Quantidade de questões:", min_value=1, max_value=15, value=5, step=1, disabled=is_battery_active)
 
 is_simulado = "🏆 SIMULADO FINAL" in tema_escolhido
 
@@ -149,7 +148,7 @@ if not is_simulado:
 st.title("📚 Português Total")
 st.caption("Resolva a bateria inteira de exercícios para comprovar aprendizado e liberar o próximo bloco.")
 
-btn_gerar = st.sidebar.button("Gerar Bateria" if not is_simulado else "INICIAR SIMULADO", on_click=resetar_estudo, type="primary")
+btn_gerar = st.sidebar.button("Gerar Bateria" if not is_simulado else "INICIAR SIMULADO", on_click=resetar_estudo, type="primary", disabled=is_battery_active)
 
 if btn_gerar or st.session_state.get("gerar_nova_bateria_agora", False):
     st.session_state.gerar_nova_bateria_agora = False
