@@ -77,7 +77,7 @@ if not st.session_state.user:
     st.write("Faça login para salvar e continuar o seu progresso.")
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        aba1, aba2 = st.tabs(["Entrar", "Criar Nova Conta"])
+        aba1, aba2, aba3 = st.tabs(["Entrar", "Criar Nova Conta", "Esqueci a Senha"])
         with aba1:
             email = st.text_input("E-mail")
             senha = st.text_input("Senha", type="password")
@@ -98,6 +98,14 @@ if not st.session_state.user:
                     st.success("Conta criada com sucesso! Faça login na aba 'Entrar'.")
                 except Exception as e:
                     st.error(f"Ocorreu um erro. A senha deve ter no mínimo 6 letras/números.")
+        with aba3:
+            email_recuperacao = st.text_input("E-mail para recuperar senha")
+            if st.button("Enviar E-mail de Recuperação"):
+                try:
+                    supabase.auth.reset_password_email(email_recuperacao)
+                    st.success("Se o e-mail estiver cadastrado, você receberá um link com as instruções.")
+                except Exception as e:
+                    st.error("Ocorreu um erro ao tentar enviar o e-mail.")
     st.stop()
 
 
